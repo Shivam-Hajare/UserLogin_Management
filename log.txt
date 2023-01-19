@@ -1,0 +1,78 @@
+const mysql = require('mysql');
+const express = require('express');
+const session = require('express-session');
+const bodyParser = require('body-parser');
+const ejs = require("ejs");
+
+var attempt=5;
+const app =express();
+app.set('view engine', 'ejs');
+app.use(bodyParser.urlencoded({
+    extended: true
+  }));
+  app.use(session({
+	secret: 'secret',
+	resave: true,
+	saveUninitialized: true
+}));
+//app.use("/assets",express.static("assets"));
+app.use(express.static("public"));
+
+const connection=mysql.createConnection({
+    host:"localhost",
+    user:"root",
+    password:"root",
+    database:"user_db"
+});
+connection.connect(function(error){
+    if(error) console.log(error);
+    else console.log("connected to DB..");
+});
+
+app.get('/',(req,res)=>{
+    res.sendFile(__dirname+"/index.html");
+});
+app.post("/",(request, response)=>{
+    let username = request.body.username;
+	let password = request.body.userpassward;
+
+    if(attempt==0)
+    {
+        response.send('cant login for 24 hr');
+        response.end();
+
+    }
+    
+	// Ensure the input fields exists and are not empty
+	if (username && password) {
+		// Execute SQL query that'll select the account from the database based on the specified username and password
+		connection.query('SELECT * FROM login_user WHERE user_Eid = ? AND user_passward = ?', [username, password], function(error, results, fields) {
+			// If there is an issue with the query, output the error
+			if (error) throw error;
+			// If the account exists
+			if (results.length > 0) {
+				// Authenticate the user
+				request.session.loggedin = true;
+				request.session.username = username;
+                attempt=5;
+				// Redirect to home page
+
+				response.redirect('/userManagement');
+			} 
+            else 
+            {
+                attempt=attempt-1;
+				 response.send('Incorrect Username and/or Password!');
+                //response.redirect("/");
+			}			
+			response.end();
+		});
+	} else {
+		response.send('Please enter Username and Password!');
+		response.end();
+	}
+});
+app.get('/userManagement',(req,res)=>{
+    res.sendFile(__dirname+"/userManagement.html");
+});
+app.listen(3000);
